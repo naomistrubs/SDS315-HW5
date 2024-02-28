@@ -1,0 +1,108 @@
+---
+title: "Naomi Struble, nas4252"
+output: html_document
+date: "2024-02-21"
+---
+
+Github link: 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+watermark <- readLines("brown_sentences.txt")
+letters <- read.csv("letter_frequencies.csv")
+library(tidyverse)
+library(mosaic)
+library(ggplot2)
+library(stringr)
+library(dplyr)
+library(kableExtra)
+```
+
+---
+
+### **Problem 1:**
+
+```{r, echo=FALSE, results=FALSE}
+sim_flagged = do(100000)*nflip(n=2021, prob=0.024)
+p_value1 = (sum(sim_flagged >= 70)) / 100000
+```
+
+```{r,echo=FALSE}
+ggplot(sim_flagged) + 
+  geom_histogram(aes(x=nflip), col='black', fill='lightblue', binwidth=1) + theme_classic()
+```
+
+The null hypothesis states that there is no difference between the flagged trades by the Iron bank and the baseline rate of .024 from the SEC. The test statistic I am using to measure against the null hypothesis is .035. Since the p-value is `r (sum(sim_flagged >= 70)) / 100000`, which is less than .05, it is safe to conclude the null hypothesis is incorrect. 
+
+## **Problem 2:**
+
+```{r, echo=FALSE, results='hide'}
+sim_gourmet = do(100000)*nflip(n=1500, prob=0.03)
+p_value2 = (sum(sim_flagged >= 50)) / 100000
+```
+
+```{r,echo=FALSE}
+ggplot(sim_gourmet) + 
+  geom_histogram(aes(x=nflip), col='black', fill='lightpink', binwidth=1) + theme_classic()
+```
+The null hypothesis states that there is no difference between the health code code citations for Gourmet Bites and the Health Departments claim of .03. The test statistic I am using to measure against the null hypothesis is .033. Since the p-value is `r (sum(sim_gourmet >= 50)) / 100000`, which is greater than .05, it is safe to conclude the null hypothesis is correct. 
+
+## **Problem 3:**
+#### Part A:
+```{r, echo=FALSE}
+#Preprocess the text
+calculation <- function(line, freq_table) {
+  freq_table$Probability <- freq_table$Probability / sum(freq_table$Probability)
+  
+  watermark <- gsub("[^A-Za-z]", "", line)
+  watermark <- toupper(watermark)
+  
+  observed <- table(factor(strsplit(watermark, "")[[1]], levels = freq_table$Letter))
+  total  <- sum(observed)
+  expected <- total * freq_table$Probability
+
+  chi_squared <- sum((observed - expected)^2 / expected)
+  
+  return(chi_squared)
+}
+
+#Calculate Chi Square Stat
+chi_square_stat <- numeric(length(watermark))
+for(i in seq_along(watermark)) {
+  chi_square_stat[i] <- calculation(watermark[i], letters)
+}
+```
+
+#### Part B:
+One of these sentences has been produced by an LLM, but watermarked by asking the LLM to subtly adjust its frequency distribution over letters. Which sentence is it? How do you know?
+```{r, echo=FALSE}
+sentences <- c(
+  "She opened the book and started to read the first chapter, eagerly anticipating what might come   next.", "Despite the heavy rain, they decided to go for a long walk in the park, crossing the     main avenue by the fountain in the center.", "The museum’s new exhibit features ancient artifacts from various civilizations around the world.", "He carefully examined the document, looking for any clues that might help solve the mystery.", ". The students gathered in the auditorium to listen to the guest speaker’s inspiring lecture.", "Feeling vexed after an arduous and zany day at work, she hoped for a peaceful and quiet evening at home, cozying up after a quick dinner with some TV, or maybe a book on her upcoming visit to Auckland.", "The chef demonstrated how to prepare a delicious meal using only locally sourced ingredients, focusing mainly on some excellent dinner recipes from Spain.", "They watched the sunset from the hilltop, marveling at the beautiful array of colors in the sky.", "The committee reviewed the proposal and provided many points of useful feedback to improve the project’s effectiveness.", "Despite the challenges faced during the project, the team worked tirelessly to ensure its successful completion, resulting in a product that exceeded everyone’s expectations."
+)
+
+chi_square_2 <- numeric(length(sentences))
+for(i in seq_along(sentences)) {
+  chi_square_2[i] <- calculation(sentences[i], letters)
+}
+
+#Calculate P values
+calc_p_values <- function(chi_squared_values, freq_table) {
+  df <- nrow(freq_table) - 1
+  
+  p_values <- pchisq(chi_squared_values, df = df, lower.tail = FALSE)
+  p_values <- round(p_values, 3)
+  
+  return(p_values)
+}
+
+p_values_2 <- calc_p_values(chi_square_2, letters)
+
+p_values <- tibble(
+  sentence_num = 1:length(chi_square_2),
+  p_value = p_values_2
+)
+
+kable(p_values, format = "markdown")
+```
+
+Sentence 6 is produced by an LLM and watermarked by asking the LLM to subtly adjust its frequency distribution over letters. This conclusion can be reached because it has a p-value of exactly 0.000, which signifies the observed difference isn't do to chance and the sentence does in fact use LLM, especially when comparing it to the other sentences.  
